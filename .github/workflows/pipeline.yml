@@ -2,7 +2,7 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
 
 jobs:
@@ -10,26 +10,33 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - run: |
+      - name: Install dependencies
+        run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - run: |
+      - name: Run tests
+        run: |
           PYTHONPATH=. pytest -v
 
-  build-and-deploy-dev:
-    if: github.ref == 'refs/heads/main'
+  build:
     needs: test
     runs-on: ubuntu-latest
 
+    outputs:
+      image_tag: ${{ steps.vars.outputs.TAG }}
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Set image tag
         id: vars
@@ -38,19 +45,22 @@ jobs:
       - name: Build Docker image
         run: |
           docker build -t platform-cicd-system:${{ steps.vars.outputs.TAG }} .
-          docker tag platform-cicd-system:${{ steps.vars.outputs.TAG }} platform-cicd-system:latest
 
-      - name: Simulate deploy to dev
-        run: |
-            echo "Deploying image ${{ steps.vars.outputs.TAG }} to DEV"
-
-  deploy-prod:
-    needs: build-and-deploy-dev
+  deploy-dev:
+    needs: build
     runs-on: ubuntu-latest
-    environment:
-      name: production
 
     steps:
-        - name: Simulate production deploy
-          run: |
-            echo "Deploying image ${{ steps.vars.outputs.TAG }} to PRODUCTION"
+      - name: Deploy to DEV
+        run: |
+          echo "Deploying image ${{ needs.build.outputs.image_tag }} to DEV"
+
+  deploy-prod:
+    needs: deploy-dev
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Deploy to PRODUCTION
+        run: |
+          echo "Deploying image ${{ needs.build.outputs.image_tag }} to PRODUCTION"
