@@ -1,4 +1,4 @@
-name: CI Pipeline
+name: CI/CD Pipeline
 
 on:
   push:
@@ -6,27 +6,51 @@ on:
   pull_request:
 
 jobs:
-  build-test:
+  test:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
-        run: |
+      - run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run tests
-        run: |
+      - run: |
           PYTHONPATH=. pytest -v
+
+  build-and-deploy-dev:
+    if: github.ref == 'refs/heads/main'
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set image tag
+        id: vars
+        run: echo "TAG=${GITHUB_SHA}" >> $GITHUB_OUTPUT
 
       - name: Build Docker image
         run: |
-          docker build -t platform-cicd-system .
+          docker build -t platform-cicd-system:${{ steps.vars.outputs.TAG }} .
+          docker tag platform-cicd-system:${{ steps.vars.outputs.TAG }} platform-cicd-system:latest
+
+      - name: Simulate deploy to dev
+        run: |
+            echo "Deploying image ${{ steps.vars.outputs.TAG }} to DEV"
+
+  deploy-prod:
+    needs: build-and-deploy-dev
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+
+    steps:
+        - name: Simulate production deploy
+          run: |
+            echo "Deploying image ${{ steps.vars.outputs.TAG }} to PRODUCTION"
