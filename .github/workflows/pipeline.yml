@@ -10,21 +10,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
-        run: |
+      - run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run tests
-        run: |
+      - run: |
           PYTHONPATH=. pytest -v
 
   build:
@@ -33,18 +29,22 @@ jobs:
 
     outputs:
       image_tag: ${{ steps.vars.outputs.TAG }}
+      short_tag: ${{ steps.vars.outputs.SHORT_SHA }}
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Set image tag
         id: vars
-        run: echo "TAG=${GITHUB_SHA}" >> $GITHUB_OUTPUT
+        run: |
+          echo "TAG=${GITHUB_SHA}" >> $GITHUB_OUTPUT
+          echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
 
       - name: Build Docker image
         run: |
           docker build -t platform-cicd-system:${{ steps.vars.outputs.TAG }} .
+          docker tag platform-cicd-system:${{ steps.vars.outputs.TAG }} platform-cicd-system:latest
+          docker tag platform-cicd-system:${{ steps.vars.outputs.TAG }} platform-cicd-system:${{ steps.vars.outputs.SHORT_SHA }}
 
   deploy-dev:
     needs: build
@@ -53,7 +53,10 @@ jobs:
     steps:
       - name: Deploy to DEV
         run: |
-          echo "Deploying image ${{ needs.build.outputs.image_tag }} to DEV"
+          echo "Deploying image:"
+          echo "  full tag: ${{ needs.build.outputs.image_tag }}"
+          echo "  short tag: ${{ needs.build.outputs.short_tag }}"
+          echo "  alias: latest"
 
   deploy-prod:
     needs: deploy-dev
@@ -64,3 +67,13 @@ jobs:
       - name: Deploy to PRODUCTION
         run: |
           echo "Deploying image ${{ needs.build.outputs.image_tag }} to PRODUCTION"
+
+  rollback:
+    needs: deploy-prod
+    runs-on: ubuntu-latest
+    if: failure()
+
+    steps:
+      - name: Simulate rollback
+        run: |
+          echo "Production deployment failed. Rolling back to previous stable version..."
