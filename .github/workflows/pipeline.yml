@@ -75,9 +75,9 @@ jobs:
           fi
 
   deploy-dev:
-    if: github.ref == 'refs/heads/develop'
     needs: build
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'
 
     steps:
       - name: Deploy to DEV
@@ -89,9 +89,9 @@ jobs:
           echo "  alias: $IMAGE:latest"
 
   deploy-prod:
-    if: github.event_name == 'release'
     needs: deploy-dev
     runs-on: ubuntu-latest
+    if: github.event_name == 'release' && github.event.action == 'published'
     environment: production
 
     steps:
