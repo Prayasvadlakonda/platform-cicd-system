@@ -16,9 +16,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
@@ -40,13 +40,17 @@ jobs:
       short_tag: ${{ steps.vars.outputs.SHORT_SHA }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set image tag
         id: vars
         run: |
           echo "TAG=${GITHUB_SHA}" >> $GITHUB_OUTPUT
           echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+
+          if [[ "${GITHUB_EVENT_NAME}" == "release" ]]; then
+          echo "RELEASE_TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
 
       - name: Log in to GHCR
         run: |
@@ -63,6 +67,12 @@ jobs:
           docker push $IMAGE:${{ steps.vars.outputs.TAG }}
           docker push $IMAGE:latest
           docker push $IMAGE:${{ steps.vars.outputs.SHORT_SHA }}
+
+          # Release tagging (only on release)
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            docker tag $IMAGE:${{ steps.vars.outputs.TAG }} $IMAGE:${{ steps.vars.outputs.RELEASE_TAG }}
+            docker push $IMAGE:${{ steps.vars.outputs.RELEASE_TAG }}
+          fi
 
   deploy-dev:
     if: github.ref == 'refs/heads/develop'
@@ -88,7 +98,12 @@ jobs:
       - name: Deploy to PRODUCTION
         run: |
           IMAGE=ghcr.io/prayasvadlakonda/platform-cicd-system
-          echo "Deploying image $IMAGE:${{ needs.build.outputs.image_tag }} to PRODUCTION"
+
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            echo "Deploying RELEASE image $IMAGE:${{ github.ref_name }} to PRODUCTION"
+          else
+            echo "Deploying image $IMAGE:${{ needs.build.outputs.image_tag }} to PRODUCTION"
+          fi
 
   rollback:
     needs: deploy-prod
