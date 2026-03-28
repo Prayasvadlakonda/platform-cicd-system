@@ -105,7 +105,6 @@ jobs:
         run: |
           IMAGE=ghcr.io/prayasvadlakonda/platform-cicd-system
           echo "Deploying image $IMAGE:${{ needs.build.outputs.image_tag }} to PRODUCTION"
-            fi
 
   rollback:
     needs: deploy-prod
