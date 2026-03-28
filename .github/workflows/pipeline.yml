@@ -89,21 +89,23 @@ jobs:
           echo "  alias: $IMAGE:latest"
 
   deploy-prod:
-    needs: deploy-dev
+    needs: build
     runs-on: ubuntu-latest
-    if: github.event_name == 'release' && github.event.action == 'published'
     environment: production
 
     steps:
+      - name: Debug event
+        run: |
+          echo "event_name=${{ github.event_name }}"
+          echo "ref=${{ github.ref }}"
+          echo "ref_name=${{ github.ref_name }}"
+          echo "action=${{ github.event.action }}"
+
       - name: Deploy to PRODUCTION
         run: |
           IMAGE=ghcr.io/prayasvadlakonda/platform-cicd-system
-
-          if [[ "${{ github.event_name }}" == "release" ]]; then
-            echo "Deploying RELEASE image $IMAGE:${{ github.ref_name }} to PRODUCTION"
-          else
-            echo "Deploying image $IMAGE:${{ needs.build.outputs.image_tag }} to PRODUCTION"
-          fi
+          echo "Deploying image $IMAGE:${{ needs.build.outputs.image_tag }} to PRODUCTION"
+            fi
 
   rollback:
     needs: deploy-prod
